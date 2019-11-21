@@ -1,4 +1,5 @@
 from __future__ import print_function, division
+import warnings
 import rhalphalib as rl
 import numpy as np
 import pickle
@@ -7,7 +8,7 @@ import uproot
 from template_morph import AffineMorphTemplate
 rl.util.install_roofit_helpers()
 
-import warnings
+
 warnings.filterwarnings('error')
 
 SF2017 = {  # cristina Jun25
@@ -61,7 +62,7 @@ def get_templ(f, region, sample, ptbin, syst=None):
     return (h_vals, h_edges, h_key)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
@@ -115,13 +116,13 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
         failCh = rl.Channel("ptbin%d%s" % (ptbin, 'fail'))
         passCh = rl.Channel("ptbin%d%s" % (ptbin, 'pass'))
 
-        passTempl = get_templ("pass", "qcd", ptbin, read_sumw2=True)
-        failTempl = get_templ("fail", "qcd", ptbin, read_sumw2=True)
+        passTempl = get_templ(f, "pass", "qcd", ptbin)
+        failTempl = get_templ(f, "fail", "qcd", ptbin)
 
-        failCh.setObservation(failTempl, read_sumw2=True)
-        passCh.setObservation(passTempl, read_sumw2=True)
-        qcdfail += failCh.getObservation()[0].sum()
-        qcdpass += passCh.getObservation()[0].sum()
+        failCh.setObservation(failTempl)
+        passCh.setObservation(passTempl)
+        qcdfail += failCh.getObservation().sum()
+        qcdpass += passCh.getObservation().sum()
 
         if MCTF:
             qcdmodel.addChannel(failCh)
@@ -134,14 +135,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
         tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
                                       limits=(0, 10))
         tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
-        print(qcdeff * tf_MCtempl(ptscaled, rhoscaled, nominal=True))
-        print(f_templates['qcd_pass'].values / f_templates['qcd_fail'].values)
 
         for ptbin in range(npt):
             print('ptbin%dfail' % ptbin)
             failCh = qcdmodel['ptbin%dfail' % ptbin]
             passCh = qcdmodel['ptbin%dpass' % ptbin]
-            failObs = failCh.getObservation()[0]
+            failObs = failCh.getObservation()
             qcdparams = np.array([
                 rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0)
                 for i in range(msd.nbins)
@@ -168,12 +167,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
                               ROOT.RooFit.Strategy(2),
                               ROOT.RooFit.Save(),
                               ROOT.RooFit.Minimizer('Minuit2', 'migrad'),
-                              ROOT.RooFit.Offset(True),
+                              ROOT.RooFit.PrintLevel(-1),
                               )
         qcdfit_ws.add(qcdfit)
         qcdfit_ws.writeToFile('qcdfit.root')
         if qcdfit.status() != 0:
-            qcdfit.Print()
+            print("Fit Status:", qcdfit.status())
             raise RuntimeError('Could not fit qcd')
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
@@ -243,18 +242,20 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
                 if sName.startswith("h"):
                     sample.setParamEffect(sys_Hpt, 1.2)
 
-                # Scale and Smear
-                mtempl = AffineMorphTemplate((templ[0], templ[1]))
-                #import pprint.pprint as pprint
-                np.set_printoptions(linewidth=1000, precision=2)
-                if sName == "zcc" and ptbin == 4:
-                    print(region)
-                    print(templ[0])
-                    print(np.sum(templ[0]))
-                    print(mtempl.get(shift=-7.)[0])
-                    print(mtempl.get(shift=7.)[0])
-                sample.setParamEffect(sys_scale,
-                                      mtempl.get(shift=7.)[0], mtempl.get(shift=-7.)[0])
+                if scalesmear_syst:
+                    # Scale and Smear
+                    mtempl = AffineMorphTemplate((templ[0], templ[1]))
+                    # import pprint.pprint as pprint
+                    np.set_printoptions(linewidth=1000, precision=2)
+                    if sName == "zcc" and ptbin == 4:
+                        print(region)
+                        print(templ[0])
+                        print(np.sum(templ[0]))
+                        print(mtempl.get(shift=-7.)[0])
+                        print(mtempl.get(shift=7.)[0])
+                    sample.setParamEffect(sys_scale,
+                                          mtempl.get(shift=7.)[0],
+                                          mtempl.get(shift=-7.)[0])
 
                 ch.addSample(sample)
 
@@ -393,9 +394,15 @@ if __name__ == '__main__':
 
     parser.add_argument("--MCTF",
                         type=str2bool,
-                        default='True',
+                        default='False',
                         choices={True, False},
-                        help="Fit QCD in MC first")
+                        help="ToFix, Fit QCD in MC first")
+
+    parser.add_argument("--scale",
+                        type=str2bool,
+                        default='False',
+                        choices={True, False},
+                        help="ToFix, Generate with scale/smear systematics")
 
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
@@ -405,5 +412,6 @@ if __name__ == '__main__':
 
     dummy_rhalphabet(pseudo=args.pseudo,
                      throwPoisson=args.throwPoisson,
-                     MCTF=args.MCTF
+                     MCTF=args.MCTF,
+                     scalesmear_syst=args.scale,
                      )
