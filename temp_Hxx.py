@@ -137,7 +137,6 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
         tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
 
         for ptbin in range(npt):
-            print('ptbin%dfail' % ptbin)
             failCh = qcdmodel['ptbin%dfail' % ptbin]
             passCh = qcdmodel['ptbin%dpass' % ptbin]
             failObs = failCh.getObservation()
@@ -167,6 +166,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
                               ROOT.RooFit.Strategy(2),
                               ROOT.RooFit.Save(),
                               ROOT.RooFit.Minimizer('Minuit2', 'migrad'),
+                              ROOT.RooFit.Offset(True),
                               ROOT.RooFit.PrintLevel(-1),
                               )
         qcdfit_ws.add(qcdfit)
