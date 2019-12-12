@@ -65,6 +65,9 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False):
     h_vals = f[hist_name].values[:, ptbin]
     h_edges = f[hist_name].edges[0]
     h_key = 'msd'
+    if read_sumw2:
+        h_variances = f[hist_name].variances[:, ptbin]
+        return (h_vals, h_edges, h_key, h_variances)
     return (h_vals, h_edges, h_key)
 
 
@@ -103,7 +106,8 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
     return 1.0 + _diff / (2. * _nom_rate)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
+                     blind=True):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
@@ -157,13 +161,13 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
         failCh = rl.Channel("ptbin%d%s" % (ptbin, 'fail'))
         passCh = rl.Channel("ptbin%d%s" % (ptbin, 'pass'))
 
-        passTempl = get_templ(f, "pass", "qcd", ptbin)
-        failTempl = get_templ(f, "fail", "qcd", ptbin)
+        passTempl = get_templ(f, "pass", "qcd", ptbin, read_sumw2=True)
+        failTempl = get_templ(f, "fail", "qcd", ptbin, read_sumw2=True)
 
-        failCh.setObservation(failTempl)
-        passCh.setObservation(passTempl)
-        qcdfail += failCh.getObservation().sum()
-        qcdpass += passCh.getObservation().sum()
+        failCh.setObservation(failTempl, read_sumw2=True)
+        passCh.setObservation(passTempl, read_sumw2=True)
+        qcdfail += failCh.getObservation()[0].sum()
+        qcdpass += passCh.getObservation()[0].sum()
 
         if MCTF:
             qcdmodel.addChannel(failCh)
@@ -180,7 +184,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
         for ptbin in range(npt):
             failCh = qcdmodel['ptbin%dfail' % ptbin]
             passCh = qcdmodel['ptbin%dpass' % ptbin]
-            failObs = failCh.getObservation()
+            failObs = failCh.getObservation()[0]
             qcdparams = np.array([
                 rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0)
                 for i in range(msd.nbins)
@@ -213,7 +217,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
         qcdfit_ws.add(qcdfit)
         qcdfit_ws.writeToFile('qcdfit.root')
         if qcdfit.status() != 0:
-            print("Fit Status:", qcdfit.status())
+            qcdfit.Print()
             raise RuntimeError('Could not fit qcd')
 
         qcdmodel.readRooFitResult(qcdfit)
@@ -252,7 +256,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
-                mask[10:14] = False
+                if blind:
+                    mask[10:14] = False
 
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
@@ -292,6 +297,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
                     sample.setParamEffect(sys_lumi, 1.025)
                     sample.setParamEffect(sys_trigger, 1.02)
                 if sName not in ["qcd", 'tqq']:
+                    sample.scale(SF2017['V_SF'])
                     sample.setParamEffect(sys_veff,
                                           1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
                 if sName not in ["qcd", "tqq", "wqq", "zqq"]:
@@ -484,7 +490,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--matched",
                         type=str2bool,
-                        default='False',
+                        default='True',
                         choices={True, False},
                         help=("Use matched/unmatched templates"
                               "(w/o there is some W/Z/H contamination from QCD)"))
@@ -492,6 +498,8 @@ if __name__ == '__main__':
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
     pseudo.add_argument('--MC', action='store_true', dest='pseudo')
+    
+    parser.add_argument('--unblind', action='store_true', dest='unblind')
 
     args = parser.parse_args()
 
@@ -499,5 +507,6 @@ if __name__ == '__main__':
                      throwPoisson=args.throwPoisson,
                      MCTF=args.MCTF,
                      scalesmear_syst=args.scale,
-                     use_matched=args.matched
+                     use_matched=args.matched,
+                     blind=(not args.unblind),
                      )
