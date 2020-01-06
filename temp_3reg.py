@@ -47,7 +47,6 @@ def get_templ2M(f, region, sample, ptbin, syst=None, read_sumw2=False):
 
 
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVectors):
-    #fitTF = False
     if use_matched:
         get_templ = get_templ2M
     else:
@@ -73,7 +72,6 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
     rhoscaled[~validbins] = 1  # we will mask these out later
 
     # Template reading
-    # f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
     f = uproot.open('hxx/templates3.root')
 
     qcdpqq, qcdpcc, qcdpbb = 0., 0., 0.
@@ -137,7 +135,9 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                 MC_samples = include_samples
                 if "qcd" not in MC_samples:
                     MC_samples = MC_samples + ['qcd']
+                if ptbin == 0: print("Making Pseudo data per bin={}, region={}".format(ptbin, region))
                 for samp in MC_samples + vector_samples:
+                    if ptbin == 0: print("    Adding ", samp)
                     yields.append(get_templ(f, region, samp, ptbin)[0])
                 yields = np.sum(np.array(yields), axis=0)
                 if throwPoisson:
@@ -148,7 +148,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
 
             # drop bins outside rho validity
             ch.mask = mask
-
+    nominals = []
+    names = []
     if paramVectors:
         for sName in vector_samples:
             tot_templ = 0
@@ -158,18 +159,15 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                     norm = np.sum(get_templ(f, reg, sName, ptbin)[0])
                     tot_templ += norm
                     tot_region[reg] += norm
+
+            vectorparams = {}
+            for reg in ['pbb', 'pcc']:
+                nom = tot_region[reg] / tot_templ
+                vectorparams['veff_%s_%s' % (sName, reg)] = rl.IndependentParameter('veff_%s_%s' % (sName, reg), nom, 0, 1)
+                print(nom, 'veff_%s_%s' % (sName, reg))
+                nominals.append(nom)
+                names.append('veff_%s_%s' % (sName, reg))
             
-            vscalefactors = {}
-            pbb_nom = tot_region['pbb'] / tot_templ
-            pcc_nom = tot_region['pcc'] / tot_templ
-            pqq_nom = tot_region['pqq'] / tot_templ
-            pcc = rl.IndependentParameter('veff_%s_pcc' % sName, pcc_nom, 0, 1)
-            pbbscaled = rl.IndependentParameter('veff_%s_pbb_scaled' % sName, pbb_nom / (1 - pcc_nom), 0, 1)
-            pbb = pbbscaled * (1 - pcc)
-            pqq = 1 - pbb - pcc
-            vscalefactors['pbb'] = (pbbscaled, pbb * (1 / pbb_nom))
-            vscalefactors['pcc'] = (pcc, pcc * (1 / pcc_nom))
-            vscalefactors['pqq'] = (pcc, pqq * (1 / pqq_nom))
 
             for ptbin in range(npt):
                 for region in ['pbb', 'pcc', 'pqq']:
@@ -184,6 +182,29 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                     sample.setParamEffect(sys_lumi, 1.023)
                     ch.addSample(sample)
 
+                for region in ['pqq']:
+                    chlist = [ch.name for ch in model.channels]
+                    chid = chlist[chlist.index("ptbin%d%s" % (ptbin, region))]
+                    ch = model[chid]
+
+                    templ = get_templ(f, region, sName, ptbin)
+
+                    stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
+                    sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
+
+                    inverse_nom = tot_templ / tot_region[region]
+                    effect = inverse_nom * (1 - vectorparams['veff_%s_pcc' % sName] - vectorparams['veff_%s_pbb' % sName])
+                    sample.setParamEffect(vectorparams['veff_%s_pcc' % sName], effect)  # pcc or pbb could go here
+
+                    sample.setParamEffect(sys_lumi, 1.023)
+                    #print("Add", sample)
+                    ch.addSample(sample)
+    
+    import pprint
+    dc = dict(zip(names, nominals))                
+    pprint.pprint(dc)
+    #print(names)
+    #print(nominals)
 
     if fitTF:
         tf1_dataResidual = rl.BernsteinPoly("tf_dataResidual_cc", (1, 3), ['pt', 'rho'],
