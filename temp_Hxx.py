@@ -426,11 +426,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
 
     if fitTF:
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'],
-<<<<<<< HEAD
-                                           limits=(-10, 10))
-=======
                                            limits=(-50, 50))
->>>>>>> WIP
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
         if MCTF:
             tf_params = qcdeff * tf_MCtempl_params_final * tf_dataResidual_params
