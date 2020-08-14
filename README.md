@@ -61,7 +61,7 @@ python ../HiggsAnalysis/CombinedLimit/test/diffNuisances.py tempModel/fitDiagnos
 PostFitShapesFromWorkspace -w model_combined.root -o shapes.root --print --postfit --sampling -f fitDiagnostics.root:fit_s
 # If withing the model dir
 python ../plot.py --data 
-python ../plotTF.py --data
+python ../plotTF.py
 
 ###
 python ../plot.py --MC --year 2017 -o plots_MC_t1
@@ -79,19 +79,24 @@ combine -M FitDiagnostics -t -1 --expectSignal 0 -d tempModel_combined.root --rM
 ### Running Impacts
 ```
 # Baseline
-combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doInitialFit --robustFit 1 --setParameterRanges r=-1,5 --cminDefaultMinimizerStrategy 0 --X-rtd FITTER_DYN_STEP --expectSignal 1 -t -1 --toysFrequentist 
+combineTool.py -M Impacts -d model_combined.root -m 125 --doInitialFit --robustFit 1 --setParameterRanges r=-1,5 --cminDefaultMinimizerStrategy 0 --X-rtd FITTER_DYN_STEP --expectSignal 1 -t -1 --toysFrequentist 
 # Condor
-combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doFits --robustFit 1 --allPars --setParameterRanges r=-1,5  -t -1 --toysFrequentist --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd MINIMIZER_analytic --job-mode condor --sub-opts='+JobFlavour = "workday"' --task-name ggHccFit --exclude 'rgx{qcdparams*}'
+combineTool.py -M Impacts -d model_combined.root -m 125 --doFits --robustFit 1 --allPars --setParameterRanges r=-1,5  -t -1 --toysFrequentist --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd MINIMIZER_analytic --job-mode condor --sub-opts='+JobFlavour = "workday"' --task-name ggHccFit --exclude 'rgx{qcdparams*}'
 # Collect
-combineTool.py -M Impacts -d tempModel_combined.root -m 125 --allPars -o impacts.json
-plotImpacts.py -i impacts.json -o impacts_out --transparent --blind
+combineTool.py -M Impacts -d model_combined.root -m 125 --allPars -o impacts.json
+plotImpacts.py -i impacts.json -o plots/impacts_out --transparent --blind
 ```
 
 ### Running likelihood scan
 ```
 combineTool.py -M MultiDimFit -d model_combined.root --cminDefaultMinimizerStrategy 0 --expectSignal 1 --robustFit 1 --algo grid --points 40 --setParameterRanges r=-20,20 -m 125 -t -1 --toysFrequentist
 
-plot1DScan.py higgsCombine.Test.MultiDimFit.mH125.root -o LScan_data_Z --y-max 30 --y-cut 30
+plot1DScan.py higgsCombine.Test.MultiDimFit.mH125.root -o plots/LScan_data_Zexp1 --y-max 30 --y-cut 30
+```
+
+### Running tests
+```
+
 ```
 
 ## Requirements
