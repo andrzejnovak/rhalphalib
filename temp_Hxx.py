@@ -148,6 +148,23 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
     return 1.0 + _diff / (2. * _nom_rate)
 
 
+def mcstat_to_numX(f, region, sName, ptbin, mask):
+    from mplhep.error_estimation import poisson_interval
+    # With Matched logic
+    _nom = get_templM(f, region, sName, ptbin, read_sumw2=True)
+    _nom_rate = np.sum(_nom[0] * mask)
+    # Get errors via Garwood interval
+    _err_lo, _err_hi = np.nan_to_num(poisson_interval(_nom[0], _nom[-1]), 0.0)
+    # _up_rate = np.sum((_nom[0] + _err_hi) * mask)
+    # _down_rate = np.sum((_nom[0] - _err_lo) * mask)
+    _up_rate = np.sum(_err_hi * mask)
+    _down_rate = np.sum(_err_hi * mask)
+    if _nom_rate < .1:
+        return 1.0
+    _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
+    return 1.0 + _diff / (2. * _nom_rate)
+
+
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                      scale_syst=True, smear_syst=True, systs=True,
                      blind=True, runhiggs=False, fitTF=True, muonCR=True,
@@ -182,6 +199,9 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
 
     sys_Hpt = rl.NuisanceParameter('CMS_gghcc_ggHpt', 'lnN')
     # sys_Hpt_shape = rl.NuisanceParameter('CMS_gghbb_ggHpt', 'shape')
+
+    # dict to keep mcstats
+    sys_mc = {}
 
     # Import binnings
     # Hidden away to be available to other functions
@@ -344,7 +364,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                 stype = rl.Sample.SIGNAL if sName in _signals else rl.Sample.BACKGROUND
 
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
-                #print(sName, region, ptbin,  np.sum(templ[0]))
+                # print(sName, region, ptbin,  np.sum(templ[0]))
                 # Systematics
                 sample.setParamEffect(sys_lumi, 1.023)
 
@@ -364,6 +384,11 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                     for sys_name, sys in zip(sys_names, sys_list):
                         _sys_ef = shape_to_numX(f, region, sName, ptbin, sys_name, mask)
                         sample.setParamEffect(sys, _sys_ef)
+
+                    if opts.mcstat:
+                        sys_mc[sName] = rl.NuisanceParameter('mcstat_{}_cat{}{}'.format(sName, ptbin, region), 'lnN')
+                        _mcstat_eff = mcstat_to_numX(f, region, sName, ptbin, mask)
+                        sample.setParamEffect(sys_mc[sName], _mcstat_eff)
 
                     # Sample specific
                     if sName not in ["qcd"]:
@@ -479,7 +504,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
     if fitTF:
         degs = tuple([int(s) for s in opts.degs.split(',')])
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", degs, ['pt', 'rho'],
-                                           limits=(-50, 50))
+        #tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (1,), ['pt'],
+                                           limits=(0, 50))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
         if MCTF:
             tf_params = qcdeff * tf_MCtempl_params_final * tf_dataResidual_params
@@ -676,6 +702,12 @@ if __name__ == '__main__':
                         choices={True, False},
                         help=("Use matched/unmatched templates"
                               "(w/o there is some W/Z/H contamination from QCD)"))
+
+    parser.add_argument("--mcstat",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Include mcstat unc")
 
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
