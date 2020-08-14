@@ -385,7 +385,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                         _sys_ef = shape_to_numX(f, region, sName, ptbin, sys_name, mask)
                         sample.setParamEffect(sys, _sys_ef)
 
-                    if opts.mcstat:
+                    if opts.mcstat and sName not in ['qcd', 'tqq']:
                         sys_mc[sName] = rl.NuisanceParameter('mcstat_{}_cat{}{}'.format(sName, ptbin, region), 'lnN')
                         _mcstat_eff = mcstat_to_numX(f, region, sName, ptbin, mask)
                         sample.setParamEffect(sys_mc[sName], _mcstat_eff)
