@@ -504,7 +504,6 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
     if fitTF:
         degs = tuple([int(s) for s in opts.degs.split(',')])
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", degs, ['pt', 'rho'],
-        #tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (1,), ['pt'],
                                            limits=(0, 50))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
         if MCTF:
