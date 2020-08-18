@@ -113,10 +113,10 @@ class TemplateSample(Sample):
         self._paramEffectsDown = {}
         self._paramEffectScales = {}
         self._extra_dependencies = set()
-        
+
     def show(self):
         print(self._nominal)
-        
+
     def scale(self, _scale):
         self._nominal *= _scale
 
@@ -158,7 +158,7 @@ class TemplateSample(Sample):
                 self._paramEffectsUp[param] = effect_up
                 return
             else:
-                raise ValueError("Template morphing can only be done via a NuisanceParameter")
+                raise ValueError("Template morphing can only be done via a NuisanceParameter or IndependentParameter")
 
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
@@ -180,6 +180,7 @@ class TemplateSample(Sample):
         elif np.all(effect_up == 1.):
             # some sort of threshold might be useful here as well
             return
+        self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
             if isinstance(effect_down, np.ndarray):
@@ -206,9 +207,6 @@ class TemplateSample(Sample):
         else:
             self._paramEffectsDown[param] = None
 
-        # at this point we are assured both up and down templates are OK
-        self._paramEffectsUp[param] = effect_up
-
         if isinstance(scale, numbers.Number):
             if isinstance(effect_up, DependentParameter):
                 raise ValueError("Scale not supported for DependentParameter effects. You can encode the effect in the dependent parameter")
@@ -223,7 +221,7 @@ class TemplateSample(Sample):
         if up:
             return self._paramEffectsUp[param]
         else:
-            if self._paramEffectsDown[param] is None:
+            if param not in self._paramEffectsDown or self._paramEffectsDown[param] is None:
                 # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
                 return 1. / self._paramEffectsUp[param]
             return self._paramEffectsDown[param]
@@ -503,7 +501,7 @@ class ParametericSample(Sample):
                 workspace.add(rooNorm)
             else:
                 if self.PreferRooParametricHist:
-                    warnings.warn("Could not load RooParametricHist, falling back to RooParametricStepFunction, which has strange rounding issues.\n" \
+                    warnings.warn("Could not load RooParametricHist, falling back to RooParametricStepFunction, which has strange rounding issues.\n"
                                   "Set ParametericSample.PreferRooParametricHist = False to disable this warning",
                                   RuntimeWarning)
                 # RooParametricStepFunction expects parameters to represent PDF density (i.e. bin width normalized, and integrates to 1)

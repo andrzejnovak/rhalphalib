@@ -12,9 +12,9 @@ def _to_numpy(hinput, read_sumw2=False):
         if read_sumw2 and not isinstance(hinput[3], np.ndarray):
             raise ValueError("Expected numpy array for eleement 3 of tuple %r, as read_sumw2=True" % hinput)
         if hinput[0].size != hinput[1].size - 1:
-            raise ValueError("Counts array and binning array are incompatible in tuple %r" % hinput)
+            raise ValueError("Counts array and binning array are incompatible in tuple %r" % (hinput,))
         if read_sumw2 and hinput[3].size != hinput[1].size - 1:
-            raise ValueError("Sumw2 array and binning array are incompatible in tuple %r" % hinput)
+            raise ValueError("Sumw2 array and binning array are incompatible in tuple %r" % (hinput,))
         return hinput
     elif "<class 'ROOT.TH1" in str(type(hinput)):
         sumw = np.zeros(hinput.GetNbinsX())
@@ -43,7 +43,6 @@ def _to_numpy(hinput, read_sumw2=False):
 def _to_TH1(sumw, binning, name):
     import ROOT
     h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
-    h.SetDirectory(0)
     if isinstance(sumw, tuple):
         for i, (w, w2) in enumerate(zip(sumw[0], sumw[1])):
             h.SetBinContent(i + 1, w)
@@ -79,6 +78,8 @@ def install_roofit_helpers():
     # TODO: configurable verbosity
     _ROOT.RooMsgService.instance().setGlobalKillBelow(_ROOT.RooFit.WARNING)
 
+    _ROOT.TH1.AddDirectory(False)
+
     def _embed_ref(obj, dependents):
         # python reference counting gc will drop rvalue dependents
         # and we don't want to hand ownership to ROOT/RooFit because it's gc is garbage
@@ -112,6 +113,12 @@ def install_roofit_helpers():
         while obj != None:  # noqa: E711
             yield obj
             obj = it.Next()
+
+    if hasattr(_ROOT.RooAbsCollection, '__iter__'):
+        # https://sft.its.cern.ch/jira/browse/ROOT-10457
+        del _ROOT.RooAbsCollection.__iter__
+        del _ROOT.RooArgList.__iter__
+        del _ROOT.RooArgSet.__iter__
 
     _ROOT.RooAbsCollection.__iter__ = _RooAbsCollection__iter__
 
