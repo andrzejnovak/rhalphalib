@@ -91,6 +91,7 @@ cdict = {
     'zbb': 'dodgerblue',
     'zcc': 'red',
     'zqq': 'turquoise',
+    'vvqq': 'magenta',
 }
 
 sdict = {
@@ -105,6 +106,7 @@ sdict = {
     'zbb': '-',
     'zcc': '-',
     'zqq': '-',
+    'vvqq': '-',
 }
 
 # Sequence of tuples because python2 is stupid
@@ -121,6 +123,7 @@ label_dict = OrderedDict([
     ('hqq', "$\mathrm{H(b\\bar{b})}$"),
     ('hcc', "$\mathrm{H(c\\bar{c})}$"),
     ('qcd', "QCD"),
+    ('vvqq', "$\mathrm{VV(q\\bar{q})}$"),
     ('tqq', "$\mathrm{t\\bar{t}}$"),
     ('stqq', "$\mathrm{single-t}$"),
 ])
