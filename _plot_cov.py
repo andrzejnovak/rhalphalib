@@ -20,7 +20,7 @@ def plot_cov(fitDiagnostics_file='fitDiagnostics.root',
         labs.append(lab)
     labs = labs[1:-1]  # Remove over/under flows
 
-    sel_labs = [l for l in labs if not (l.startswith('qcd') or l.startswith('tf'))]
+    sel_labs = [l for l in labs if not (l.startswith('qcd') or l.startswith('mcstat'))]
     sel_ixes = [labs.index(l) for l in sel_labs]
 
     # Get only values we want

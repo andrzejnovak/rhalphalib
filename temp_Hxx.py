@@ -52,14 +52,15 @@ SF = {
 
 
 def ddx_SF(f, region, sName, ptbin, mask,
-           SF=SF["2017"]['CC_SF'], SF_unc=SF["2017"]['CC_SF_ERR']):
+           SF=SF["2017"]['CC_SF'], SF_unc=SF["2017"]['CC_SF_ERR'], 
+           muon=False):
     if region == "pass":
         return 1. + SF_unc/SF
     else:
-        _pass = get_templX(f, "pass", sName, ptbin)
+        _pass = get_templX(f, "pass", sName, ptbin, muon=muon)
         _pass_rate = np.sum(_pass[0] * mask)
 
-        _fail = get_templX(f, "fail", sName, ptbin)
+        _fail = get_templX(f, "fail", sName, ptbin, muon=muon)
         _fail_rate = np.sum(_fail[0] * mask)
 
         if _fail_rate > 0:
@@ -68,14 +69,14 @@ def ddx_SF(f, region, sName, ptbin, mask,
             return 1
 
 
-def shape_to_num(f, region, sName, ptbin, syst, mask):
-    _nom = get_templ(f, region, sName, ptbin)
+def shape_to_num(f, region, sName, ptbin, syst, mask, muon=False):
+    _nom = get_templ(f, region, sName, ptbin, muon=muon)
     _nom_rate = np.sum(_nom[0] * mask)
     if _nom_rate < .1:
         return 1.0
-    _up = get_templ(f, region, sName, ptbin, syst=syst+"Up")
+    _up = get_templ(f, region, sName, ptbin, syst=syst+"Up", muon=muon)
     _up_rate = np.sum(_up[0] * mask)
-    _down = get_templ(f, region, sName, ptbin, syst=syst+"Up")
+    _down = get_templ(f, region, sName, ptbin, syst=syst+"Up", muon=muon)
     _down_rate = np.sum(_down[0] * mask)
     _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
     return 1.0 + _diff / (2. * _nom_rate)
@@ -116,9 +117,11 @@ def get_templM(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False
         hist_name += "_" + syst
     if syst is None and muon:
         hist_name += "_"
-    if (sample.startswith("w") or sample.startswith("z")
-            or sample.startswith("h")) and syst is None:
-        hist_name += "_" + 'matched'
+    if (sample in ['zbb', 'zcc', 'zqq', 'wcq', 'wqq'] or sample.startswith("h")) and syst is None:
+        if not muon:
+            hist_name += "_" + 'matched'
+        else:
+            hist_name += 'matched'
     if muon:
         h_vals = f[hist_name].values
         h_edges = f[hist_name].edges
@@ -127,38 +130,39 @@ def get_templM(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False
         h_edges = f[hist_name].edges[0]
     h_key = 'msd'
     if read_sumw2:
-        h_variances = f[hist_name].variances[:, ptbin]
+        if muon:
+            h_variances = f[hist_name].variances
+        else:
+            h_variances = f[hist_name].variances[:, ptbin]
         return (h_vals, h_edges, h_key, h_variances)
     return (h_vals, h_edges, h_key)
 
 
-def shape_to_numM(f, region, sName, ptbin, syst, mask):
+def shape_to_numM(f, region, sName, ptbin, syst, mask, muon=False):
     # With Matched logic
-    _nom = get_templM(f, region, sName, ptbin)
+    _nom = get_templM(f, region, sName, ptbin, muon=muon)
     _nom_rate = np.sum(_nom[0] * mask)
     if _nom_rate < .1:
         return 1.0
-    _up = get_templ(f, region, sName, ptbin, syst=syst+"Up")
-    _up_unmatched = get_templ(f, region, sName, ptbin, 'unmatched')
+    _up = get_templ(f, region, sName, ptbin, syst=syst+"Up", muon=muon)
+    _up_unmatched = get_templ(f, region, sName, ptbin, 'unmatched', muon=muon)
     _up_rate = np.sum(_up[0] * mask) - np.sum(_up_unmatched[0] * mask)
-    _down = get_templ(f, region, sName, ptbin, syst=syst+"Up")
-    _down_unmatched = get_templ(f, region, sName, ptbin, 'unmatched')
+    _down = get_templ(f, region, sName, ptbin, syst=syst+"Up", muon=muon)
+    _down_unmatched = get_templ(f, region, sName, ptbin, 'unmatched', muon=muon)
     _down_rate = np.sum(_down[0] * mask) - np.sum(_down_unmatched[0] * mask)
     _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
     return 1.0 + _diff / (2. * _nom_rate)
 
 
-def mcstat_to_numX(f, region, sName, ptbin, mask):
+def mcstat_to_numX(f, region, sName, ptbin, mask, muon=False):
     from mplhep.error_estimation import poisson_interval
     # With Matched logic
-    _nom = get_templM(f, region, sName, ptbin, read_sumw2=True)
+    _nom = get_templM(f, region, sName, ptbin, read_sumw2=True, muon=muon)
     _nom_rate = np.sum(_nom[0] * mask)
     # Get errors via Garwood interval
-    _err_lo, _err_hi = np.nan_to_num(poisson_interval(_nom[0], _nom[-1]), 0.0)
-    # _up_rate = np.sum((_nom[0] + _err_hi) * mask)
-    # _down_rate = np.sum((_nom[0] - _err_lo) * mask)
-    _up_rate = np.sum(_err_hi * mask)
-    _down_rate = np.sum(_err_hi * mask)
+    _err_lo, _err_hi = np.nan_to_num(np.abs(poisson_interval(_nom[0], _nom[-1]) - _nom[0]), 0.0)
+    _up_rate = np.sum((_nom[0] + _err_hi) * mask)
+    _down_rate = np.sum((_nom[0] - _err_lo) * mask)
     if _nom_rate < .1:
         return 1.0
     _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
@@ -460,17 +464,13 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                 if smear_syst and sName not in ["qcd", 'tqq', 'stqq']:
                     # To Do
                     # Match to boson mass instead of mean
-                    # smear_in, smear_unc = 1, 0.11
                     smear_in, smear_unc = SF[year]['smear_SF'], SF[year]['smear_SF_ERR']
-                    #smear_in, smear_unc = 1, 0.3
                     _smear_up = mtempl.get(scale=smear_in + 1 * smear_unc,
                                            shift=-mtempl.mean *
                                            (smear_in + 1 * smear_unc - 1))
-                    #print(_smear_up)
                     _smear_down = mtempl.get(scale=smear_in + -1 * smear_unc,
                                              shift=-mtempl.mean *
                                              (smear_in + -1 * smear_unc - 1))
-                    #print(_smear_down)
                     sample.setParamEffect(sys_smear, _smear_up, _smear_down)
 
                 ch.addSample(sample)
@@ -558,7 +558,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
         for region in ['pass', 'fail']:
             ch = rl.Channel("muonCR%s" % (region, ))
             model.addChannel(ch)
-            include_samples = ["qcd", "tqq", 'stqq']
+            include_samples = ["qcd", "tqq", 'stqq', 'vvqq', 'zll', 'wlnu', 'wqq', 'zqq']
 
             for sName in include_samples:
 
@@ -566,10 +566,49 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                 stype = rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
-                # mock systematics
-                #jecup_ratio = np.random.normal(loc=1, scale=0.05, size=msd.nbins)
-                #sample.setParamEffect(jec, jecup_ratio)
                 sample.setParamEffect(sys_lumi, 1.023)
+
+                if systs:
+                    sys_names = ['JES', "JER", 'Pu']
+                    sys_list = [sys_JES, sys_JER, sys_Pu]
+                    for sys_name, sys in zip(sys_names, sys_list):
+                        _sys_ef = shape_to_numX(f_mu, region, sName, ptbin, sys_name, mask, muon=True)
+                        sample.setParamEffect(sys, _sys_ef)
+
+                    if opts.mcstat and sName not in ['qcd', 'tqq']:
+                        sys_mc[sName] = rl.NuisanceParameter('mcstat_{}_cat{}{}'.format(sName, ptbin, region), 'lnN')
+                        _mcstat_eff = mcstat_to_numX(f_mu, region, sName, ptbin, mask, muon=True)
+                        sample.setParamEffect(sys_mc[sName], _mcstat_eff)
+
+                    # Sample specific
+                    if sName not in ["qcd"]:
+                        sample.setParamEffect(sys_eleveto, 1.005)
+                        sample.setParamEffect(sys_muveto, 1.005)
+                        sample.setParamEffect(sys_lumi, 1.025)
+                        sample.setParamEffect(sys_trigger, 1.02)
+                    if sName not in ["qcd", 'tqq', 'stqq', 'zll', 'wlnu']:
+                        sample.scale(SF[year]['V_SF'])
+                        sample.setParamEffect(sys_veff,
+                                            1.0 + SF[year]['V_SF_ERR'] / SF[year]['V_SF'])
+                        #1.3)
+                    if sName.startswith("z"):
+                        sample.setParamEffect(sys_znormQ, 1.1)
+                        if ptbin >= 2:
+                            sample.setParamEffect(sys_znormEW, 1.07)
+                        else:
+                            sample.setParamEffect(sys_znormEW, 1.05)
+                    if sName.startswith("w"):
+                        sample.setParamEffect(sys_znormQ, 1.1)
+                        if ptbin >= 2:
+                            sample.setParamEffect(sys_znormEW, 1.07)
+                        else:
+                            sample.setParamEffect(sys_znormEW, 1.05)
+                        if ptbin >= 3:
+                            sample.setParamEffect(sys_wznormEW, 1.06)
+                        else:
+                            sample.setParamEffect(sys_wznormEW, 1.02)
+                    if sName.startswith("h"):
+                        sample.setParamEffect(sys_Hpt, 1.2)
 
                 ch.addSample(sample)
 
@@ -720,7 +759,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--degs",
                         type=str,
-                        default='1,1',
+                        default='1,2',
                         help="Polynomial degrees in the shape 'pt,rho' e.g. '2,2'")
 
     parser.add_argument("--degsMC",
@@ -751,11 +790,11 @@ if __name__ == '__main__':
                              read_sumw2=read_sumw2,
                              muon=muon)
 
-    def shape_to_numX(f, region, sName, ptbin, syst, mask):
+    def shape_to_numX(f, region, sName, ptbin, syst, mask, muon=False):
         if args.matched:
-            return shape_to_numM(f, region, sName, ptbin, syst, mask)
+            return shape_to_numM(f, region, sName, ptbin, syst, mask, muon=muon)
         else:
-            return shape_to_num(f, region, sName, ptbin, syst, mask)
+            return shape_to_num(f, region, sName, ptbin, syst, mask, muon=muon)
 
     dummy_rhalphabet(pseudo=args.pseudo,
                      throwPoisson=args.throwPoisson,
