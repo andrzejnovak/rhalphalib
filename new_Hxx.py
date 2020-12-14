@@ -92,17 +92,25 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False)
     hist_name = '{}_{}'.format(sample, region)
     if syst is not None:
         hist_name += "_" + syst
+    else:
+        hist_name += "_nominal"
     if syst is None and muon:
         hist_name += "_"
     if muon:
         h_vals = f[hist_name].values
         h_edges = f[hist_name].edges
     else:
-        h_vals = f[hist_name].values[:, ptbin]
-        h_edges = f[hist_name].edges[0]
+        #print(f.keys())
+        h_vals = f[hist_name+"_bin{}".format(ptbin)].values
+        h_edges = f[hist_name+"_bin{}".format(ptbin)].edges
+        # if any([h == 0 for h in h_vals]):
+        #     print("Zero bins found in template {}".format(hist_name+"_bin{}".format(ptbin)))
+        #     print(h_vals)
+        #     print("Zero bins will be padded by epsilon value")
+        #     h_vals = np.array([1e-5 if h == 0 else h for h in h_vals ])
     h_key = 'msd'
     if read_sumw2:
-        h_variances = f[hist_name].variances[:, ptbin]
+        h_variances = f[hist_name+"_bin{}".format(ptbin)].variances
         return (h_vals, h_edges, h_key, h_variances)
     return (h_vals, h_edges, h_key)
 
@@ -157,7 +165,7 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask, muon=False):
 def mcstat_to_numX(f, region, sName, ptbin, mask, muon=False):
     from mplhep.error_estimation import poisson_interval
     # With Matched logic
-    _nom = get_templM(f, region, sName, ptbin, read_sumw2=True, muon=muon)
+    _nom = get_templX(f, region, sName, ptbin, read_sumw2=True, muon=muon)
     _nom_rate = np.sum(_nom[0] * mask)
     # Get errors via Garwood interval
     _err_lo, _err_hi = np.nan_to_num(np.abs(poisson_interval(_nom[0], _nom[-1]) - _nom[0]), 0.0)
@@ -241,6 +249,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
         f_mu = uproot.open('2016v2/hist_1DZcc_muonCR.root')
     else:
         raise ValueError("Invalid Year")
+    if opts.model is not None:
+        model_name = opts.model
 
     # Get QCD efficiency
     if MCTF:
@@ -760,6 +770,11 @@ if __name__ == '__main__':
                         type=str,
                         default=None,
                         help="Primary templates")
+
+    parser.add_argument('-o', "--model",
+                        type=str,
+                        default=None,
+                        help="Model directory")
 
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
