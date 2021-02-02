@@ -181,8 +181,8 @@ if __name__ == '__main__':
     fail_qcd, pass_qcd = [], []
     bins = []
     for ipt in range(6):
-        fail_qcd.append(f['ptbin{}fail_{}/qcd'.format(ipt, region)].values)
-        pass_qcd.append(f['ptbin{}pass_{}/qcd'.format(ipt, region)].values)
+        fail_qcd.append(f['ptbin{}fail{}_{}/qcd'.format(ipt, args.year, region)].values)
+        pass_qcd.append(f['ptbin{}pass{}_{}/qcd'.format(ipt, args.year, region)].values)
 
     fail_qcd = np.array(fail_qcd)
     pass_qcd = np.array(pass_qcd)
@@ -198,8 +198,8 @@ if __name__ == '__main__':
     fail_qcd, pass_qcd = [], []
     bins = []
     for ipt in range(6):
-        fail_qcd.append(f['ptbin{}fail_{}/qcd'.format(ipt, region)].values)
-        pass_qcd.append(f['ptbin{}pass_{}/qcd'.format(ipt, region)].values)
+        fail_qcd.append(f['ptbin{}fail{}_{}/qcd'.format(ipt, args.year, region)].values)
+        pass_qcd.append(f['ptbin{}pass{}_{}/qcd'.format(ipt, args.year, region)].values)
 
     fail_qcd = np.array(fail_qcd)
     pass_qcd = np.array(pass_qcd)

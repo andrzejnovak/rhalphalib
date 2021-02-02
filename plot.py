@@ -515,7 +515,7 @@ for shape_type in shape_types:
         mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
         for i in range(0, 6):
             if not args.run_all: continue
-            cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
+            cat_name = 'ptbin{}{}{}_{};1'.format(i, region, args.year, shape_type)
             try:
                 cat = f[cat_name]
             except Exception:
@@ -524,7 +524,7 @@ for shape_type in shape_types:
                                     args.fit, f.keys()))
 
             fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys)
-        full_plot([f['ptbin{}{}_{};1'.format(i, region, shape_type)] for i in range(0, 6)],
+        full_plot([f['ptbin{}{}{}_{};1'.format(i, region, args.year, shape_type)] for i in range(0, 6)],
                    pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys)
         # MuonCR if included
         try:
@@ -552,13 +552,13 @@ try:
             print("Plotting inputs", region)
             _mask = not input_pseudo
             mask = (_mask & (region == "pass")) | (_mask & (region == "pcc"))  | (_mask & (region == "pbb"))
-            full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)] for i in range(0, 6)],
+            full_plot([mockd['ptbin{}{}{}_{}'.format(i, region, args.year, shape_type)] for i in range(0, 6)],
                     pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
 
             # Per bin plots
             for i in range(0, 6):
                 if not args.run_all: continue
-                full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)]],
+                full_plot([mockd['ptbin{}{}{}_{}'.format(i, region, args.year, shape_type)]],
                     pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
 
             # MuonCR if included
