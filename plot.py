@@ -42,6 +42,10 @@ parser.add_argument("--fit",
                     choices={"prefit", "postfit"},
                     dest='fit',
                     help="Shapes to plot")
+parser.add_argument("--fd",
+                    action='store_true',
+                    dest='fitDiag',
+                    help="Plot from fitDiag")
 parser.add_argument("--3reg",
                     action='store_true',
                     dest='three_regions',
@@ -131,7 +135,9 @@ label_dict = OrderedDict([
 
 def full_plot(cats, pseudo=True, fittype="", mask=False,
               toys=False, 
-              sqrtnerr=False):
+              sqrtnerr=False,
+              fromFD=False,
+              ):
 
     # Determine:
     if "pass" in str(cats[0].name) or "fail" in str(cats[0].name):
@@ -157,7 +163,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
         _y = tgasym._fY * _binwidth
         _xerrlo, _xerrhi = tgasym._fEXlow, tgasym._fEXhigh
         _yerrlo, _yerrhi = tgasym._fEYlow * _binwidth, tgasym._fEYhigh * _binwidth
-        return _x, _y, _yerrlo, _yerrhi, _xerrlo, _xerrhi
+        return _x, _y, [_yerrlo, _yerrhi], [_xerrlo, _xerrhi]
 
     def plot_data(x, y, yerr, xerr, ax=None, pseudo=pseudo, ugh=None):
         if ugh is None:
@@ -203,8 +209,10 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
                     label=_d_label,
                     **data_err_opts)
 
-    def th1_to_step(th1):
+    def th1_to_step(th1, restoreNorm=fromFD):
         _h, _bins = th1.numpy()
+        if restoreNorm:
+            _h = _h * np.diff(_bins)
         return _bins, np.r_[_h, _h[-1]]
 
     def th1_to_err(th1):
@@ -214,6 +222,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
         _var = th1.variances
 
         return _x, _h, _var, [_xerr[0], _xerr[1]]
+
 
     def plot_step(bins, h, ax=None, label=None, nozeros=True, **kwargs):
         if mask and not pseudo:
@@ -255,14 +264,26 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
     #  Main
     # print(cats[0])
-    res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
+    if fromFD:
+        res = np.array(list(map(tgasym_to_err, [cat['data'] for cat in cats])))
+    else:
+        res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
     _x, _h = res[:, 0][0], np.sum(res[:, 1], axis=0)
     _xerr = res[:, -1][0]
     if sqrtnerr:
         _yerr = np.sqrt(_h)
+        plot_data(_x, _h, yerr=[_yerr, _yerr], xerr=_xerr, ax=ax, ugh=ugh)
     else:
-        _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
-    plot_data(_x, _h, yerr=[_yerr, _yerr], xerr=_xerr, ax=ax, ugh=ugh)
+        if fromFD:
+            # FIXME
+            # _yerrlo = np.sqrt(np.sum(res[:, 2][0]**2, axis=0))
+            # _yerrhi = np.sqrt(np.sum(res[:, 2][1]**2, axis=0))
+            # print(_yerrlo, _yerrhi)
+            #plot_data(_x, _h, yerr=[_yerrlo, _yerrhi], xerr=_xerr, ax=ax, ugh=ugh)
+            plot_data(_x, _h, yerr=[np.sqrt(_h), np.sqrt(_h)], xerr=_xerr, ax=ax, ugh=ugh)
+        else:
+            _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
+            plot_data(_x, _h, yerr=[_yerr, _yerr], xerr=_xerr, ax=ax, ugh=ugh)
 
     # Stack qcd/ttbar
     tot_h, bins = None, None
@@ -318,10 +339,14 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     rax.axhline(0, c='gray', ls='--')
 
     # Caculate diff
-    res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
+    if fromFD:
+        res = np.array(list(map(tgasym_to_err, [cat['data'] for cat in cats])))
+    else:
+        res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
     _x, _y = res[:, 0][0], np.sum(res[:, 1], axis=0)
     _xerr = res[:, -1][0]
-    if sqrtnerr:
+    if sqrtnerr or fromFD:
+        # FIXME fromFD should be separate
         _yerr = np.sqrt(_h)
     else:
         _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
@@ -484,6 +509,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
             _insert_ix, plt.Line2D([], [], linestyle='none', marker=None))
         sorted_handles_labels[1].insert(_insert_ix, '')
     leg = ax.legend(*sorted_handles_labels, ncol=2, columnspacing=0.8)
+    if fittype == 'fit_s':
+        fittype = 'postfit'
     leg.set_title(title=fittype.capitalize(), prop={'size': "smaller"})
 
     if b'muon' in cats[0].name:
@@ -499,7 +526,10 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
 
 if args.fit is None:
-    shape_types = ['prefit', 'postfit']
+    if args.fitDiag:
+        shape_types = ['prefit', 'fit_s']    
+    else:
+        shape_types = ['prefit', 'postfit']
 else:
     shape_types = [args.fit]
 if args.three_regions:
@@ -507,7 +537,10 @@ if args.three_regions:
 else:
     regions = ['pass', 'fail']
 
-f = uproot.open(os.path.join(args.dir, args.input_file))
+if args.fitDiag:
+    f = uproot.open(os.path.join(args.dir, 'fitDiagnostics.root'))
+else:
+    f = uproot.open(os.path.join(args.dir, args.input_file))
 for shape_type in shape_types:
     pbins = [450, 500, 550, 600, 675, 800, 1200]
     for region in regions:
@@ -520,12 +553,16 @@ for shape_type in shape_types:
                 cat = f[cat_name]
             except Exception:
                 raise ValueError("Namespace {} is not available, only following"
-                                "namespaces were found in the file: {}".format(
+                                 "namespaces were found in the file: {}".format(
                                     args.fit, f.keys()))
 
             fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys)
-        full_plot([f['ptbin{}{}{}_{};1'.format(i, region, args.year, shape_type)] for i in range(0, 6)],
-                   pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys)
+        if args.fitDiag:
+            full_plot([f['shapes_{}/ptbin{}{}{};1'.format(shape_type, i, region, args.year)] for i in range(0, 6)],
+                   pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys, fromFD=args.fitDiag, sqrtnerr=True)
+        else:
+            full_plot([f['ptbin{}{}{}_{};1'.format(i, region, args.year, shape_type)] for i in range(0, 6)],
+                   pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys, sqrtnerr=True)
         # MuonCR if included
         try:
             cat = f['muonCR{}_{};1'.format(region, shape_type)]
@@ -583,4 +620,9 @@ if args.three_regions:
 plot_cov(os.path.join(args.dir, 'fitDiagnostics.root'),
          out='{}/{}.png'.format(args.output_folder, 'covariances'),
          data=((not args.pseudo) | args.toys), year=args.year,
+         )
+
+plot_cov(os.path.join(args.dir, 'fitDiagnostics.root'),
+         out='{}/{}_wTF.png'.format(args.output_folder, 'covariances'),
+         data=((not args.pseudo) | args.toys), year=args.year, include='tf',
          )
