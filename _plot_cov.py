@@ -8,8 +8,9 @@ import root_numpy as rnp
 
 
 def plot_cov(fitDiagnostics_file='fitDiagnostics.root',
-             out='covariance_matrix.png',
+             out='covariance_matrix.png', include=None,
              data=False, year=2017):
+    assert include in [None, 'all', 'tf']
     rf = r.TFile.Open(fitDiagnostics_file)
     h2 = rf.Get('fit_s').correlationHist()
     TH2 = rnp.hist2array(h2)
@@ -20,7 +21,12 @@ def plot_cov(fitDiagnostics_file='fitDiagnostics.root',
         labs.append(lab)
     labs = labs[1:-1]  # Remove over/under flows
 
-    sel_labs = [l for l in labs if not (l.startswith('qcd') or l.startswith('mcstat'))]
+    if include == 'all':
+        sel_labs = [l for l in labs]
+    elif include == 'tf':
+        sel_labs = [l for l in labs if not (l.startswith('qcd') or l.startswith('mcstat'))]
+    else:
+        sel_labs = [l for l in labs if not (l.startswith('qcd') or l.startswith('mcstat') or l.startswith('tf'))]
     sel_ixes = [labs.index(l) for l in sel_labs]
 
     # Get only values we want
