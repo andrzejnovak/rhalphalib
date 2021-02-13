@@ -754,7 +754,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--muCR",
                         type=str2bool,
-                        default='True',
+                        default='False',
                         choices={True, False},
                         help="Include muonCR to constrain ttbar")
 
@@ -795,7 +795,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--matched",
                         type=str2bool,
-                        default='True',
+                        default='False',
                         choices={True, False},
                         help=("Use matched/unmatched templates"
                               "(w/o there is some W/Z/H contamination from QCD)"))

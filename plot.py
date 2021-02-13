@@ -33,6 +33,10 @@ parser.add_argument("-d",
                     "--dir",
                     default='',
                     help="Model/Fit dir")
+parser.add_argument("--fd",
+                    action='store_true',
+                    dest='fitDiag',
+                    help="Plot from fitDiag")
 parser.add_argument("-i",
                     "--input-file",
                     default='shapes.root',
@@ -42,10 +46,6 @@ parser.add_argument("--fit",
                     choices={"prefit", "postfit"},
                     dest='fit',
                     help="Shapes to plot")
-parser.add_argument("--fd",
-                    action='store_true',
-                    dest='fitDiag',
-                    help="Plot from fitDiag")
 parser.add_argument("--3reg",
                     action='store_true',
                     dest='three_regions',
