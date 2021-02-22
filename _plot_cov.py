@@ -24,9 +24,9 @@ def plot_cov(fitDiagnostics_file='fitDiagnostics.root',
     if include == 'all':
         sel_labs = [l for l in labs]
     elif include == 'tf':
-        sel_labs = [l for l in labs if not (l.startswith('qcd') or l.startswith('mcstat'))]
+        sel_labs = [l for l in labs if not (l.startswith('qcdparam') or 'mcstat' in l)]
     else:
-        sel_labs = [l for l in labs if not (l.startswith('qcd') or l.startswith('mcstat') or l.startswith('tf'))]
+        sel_labs = [l for l in labs if not (l.startswith('qcdparam') or 'mcstat' in l or l.startswith('tf'))]
     sel_ixes = [labs.index(l) for l in sel_labs]
 
     # Get only values we want

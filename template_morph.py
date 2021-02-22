@@ -7,7 +7,9 @@ class AffineMorphTemplate(object):
         '''
         hist: a numpy-histogram-like tuple of (sumw, edges, name)
         '''
-        self.sumw, self.edges, self.varname = hist
+        self.sumw = hist[0]
+        self.edges = hist[1]
+        self.varname = hist[2]
         self.norm = self.sumw.sum()
         self.mean = (self.sumw*(self.edges[:-1] + self.edges[1:])/2).sum() / self.norm
         self.cdf = interp1d(x=self.edges,

@@ -176,17 +176,17 @@ if __name__ == '__main__':
 
     # Get Info from Shapes
     # Build 2D
-    f = uproot.open(os.path.join(args.dir, args.input_file))
+    #f = uproot.open(os.path.join(args.dir, args.input_file))
+    f = uproot.open(os.path.join(args.dir, 'fitDiagnostics.root'))
     region = 'prefit'
     fail_qcd, pass_qcd = [], []
     bins = []
     for ipt in range(6):
-        fail_qcd.append(f['ptbin{}fail{}_{}/qcd'.format(ipt, args.year, region)].values)
-        pass_qcd.append(f['ptbin{}pass{}_{}/qcd'.format(ipt, args.year, region)].values)
+        fail_qcd.append(f['shapes_{}/ptbin{}{}{}/qcd;1'.format('prefit', ipt, 'fail', args.year)].values)
+        pass_qcd.append(f['shapes_{}/ptbin{}{}{}/qcd;1'.format('prefit', ipt, 'pass', args.year)].values)
 
     fail_qcd = np.array(fail_qcd)
     pass_qcd = np.array(pass_qcd)
-
     mask = ~np.isclose(pass_qcd, np.zeros_like(pass_qcd))
     mask *= ~np.isclose(fail_qcd, np.zeros_like(fail_qcd))
     q = np.sum(pass_qcd[mask])/np.sum(fail_qcd[mask])
@@ -198,8 +198,8 @@ if __name__ == '__main__':
     fail_qcd, pass_qcd = [], []
     bins = []
     for ipt in range(6):
-        fail_qcd.append(f['ptbin{}fail{}_{}/qcd'.format(ipt, args.year, region)].values)
-        pass_qcd.append(f['ptbin{}pass{}_{}/qcd'.format(ipt, args.year, region)].values)
+        fail_qcd.append(f['shapes_{}/ptbin{}{}{}/qcd;1'.format('fit_s', ipt, 'fail', args.year)].values)
+        pass_qcd.append(f['shapes_{}/ptbin{}{}{}/qcd;1'.format('fit_s', ipt, 'pass', args.year)].values)
 
     fail_qcd = np.array(fail_qcd)
     pass_qcd = np.array(pass_qcd)
