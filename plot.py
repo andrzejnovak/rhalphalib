@@ -38,12 +38,12 @@ parser.add_argument("--fd",
                     dest='fitDiag',
                     help="Plot from fitDiag")
 parser.add_argument("-i",
-                    "--input-file",
-                    default='shapes.root',
+                    "--input",
+                    default='fitDiagnostics.root',
                     help="Input shapes file")
 parser.add_argument("--fit",
                     default=None,
-                    choices={"prefit", "postfit"},
+                    choices={"prefit", "fit_s"},
                     dest='fit',
                     help="Shapes to plot")
 parser.add_argument("--3reg",
@@ -58,6 +58,10 @@ parser.add_argument("--all",
                     action='store_true',
                     dest='run_all',
                     help="Include split pT bin plots")
+parser.add_argument("--run2",
+                    action='store_true',
+                    dest='run2',
+                    help="Stack all years")
 parser.add_argument("-o", "--output-folder",
                     default='plots',
                     dest='output_folder',
@@ -72,6 +76,13 @@ parser.add_argument("--scaleH",
                     choices={True, False},
                     help="Scale Higgs signal in plots by 100")
 
+parser.add_argument("--filled",
+                    type=str2bool,
+                    default='True',
+                    choices={True, False},
+                    help="Use filled stack plots")
+
+
 
 pseudo = parser.add_mutually_exclusive_group(required=True)
 pseudo.add_argument('--data', action='store_false', dest='pseudo')
@@ -84,33 +95,24 @@ if args.output_folder.split("/")[0] != args.dir:
 make_dirs(args.output_folder)
 
 cdict = {
-    'hqq': 'blue',
-    'hbb': 'blue',
-    'hcc': 'darkred',
-    'wqq': 'lightgreen',
-    'wcq': 'green',
+    'hqq': '#6479B9',
+    'hbb': '#6479B9',
+    'hcc': '#EE2F36',
+    # 'wqq': 'lightgreen',
+    # 'wcq': 'green',
+    'wqq': '#6CAE75',
+    'wcq': '#007A7A',
     'qcd': 'gray',
     'tqq': 'plum',
     'stqq': 'lightblue',
-    'zbb': 'dodgerblue',
-    'zcc': 'red',
-    'zqq': 'turquoise',
+    'top' : 'gray',
+    # 'zbb': 'dodgerblue',
+    # 'zcc': 'red',
+    # 'zqq': 'turquoise',
+    'zbb': '#2C497F',
+    'zcc': '#A4243B',
+    'zqq': '#E09F3E',
     'vvqq': 'magenta',
-}
-
-sdict = {
-    'hqq': '-',
-    'hbb': '-',
-    'hcc': '-',
-    'wqq': '-',
-    'wcq': '-',
-    'qcd': '-',
-    'tqq': '-',
-    'stqq': '-',
-    'zbb': '-',
-    'zcc': '-',
-    'zqq': '-',
-    'vvqq': '-',
 }
 
 # Sequence of tuples because python2 is stupid
@@ -118,25 +120,30 @@ label_dict = OrderedDict([
     ('Data', 'Data'),
     ('MC', 'MC'),
     ('Toys', 'PostFit\nToys'),
+    ('hbb', "$\mathrm{H(b\\bar{b})}$"),
+    ('hqq', "$\mathrm{H(b\\bar{b})}$"),
     ('zbb', "$\mathrm{Z(b\\bar{b})}$"),
     ('zcc', "$\mathrm{Z(c\\bar{c})}$"),
     ('zqq', "$\mathrm{Z(q\\bar{q})}$"),
     ('wcq', "$\mathrm{W(c\\bar{q})}$"),
     ('wqq', "$\mathrm{W(q\\bar{q})}$"),
-    ('hbb', "$\mathrm{H(b\\bar{b})}$"),
-    ('hqq', "$\mathrm{H(b\\bar{b})}$"),
-    ('hcc', "$\mathrm{H(c\\bar{c})}$"),
-    ('qcd', "QCD"),
     ('vvqq', "$\mathrm{VV(q\\bar{q})}$"),
+    ('top', "$\mathrm{Top}$"),
     ('tqq', "$\mathrm{t\\bar{t}}$"),
     ('stqq', "$\mathrm{single-t}$"),
+    ('qcd', "QCD"),
+    ('hcc', "$\mathrm{H(c\\bar{c})}$"),
 ])
 
+mergedict = {
+    'top': ['stqq','tqq']
+}
 
 def full_plot(cats, pseudo=True, fittype="", mask=False,
               toys=False, 
               sqrtnerr=False,
               fromFD=False,
+              filled=False,
               ):
 
     # Determine:
@@ -165,7 +172,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
         _yerrlo, _yerrhi = tgasym._fEYlow * _binwidth, tgasym._fEYhigh * _binwidth
         return _x, _y, [_yerrlo, _yerrhi], [_xerrlo, _xerrhi]
 
-    def plot_data(x, y, yerr, xerr, ax=None, pseudo=pseudo, ugh=None):
+    def plot_data(x, y, yerr, xerr, ax=None, pseudo=pseudo, ugh=None, **kwargs):
         if ugh is None:
             ugh = Ugh()
         data_err_opts = {
@@ -175,6 +182,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
             'color': 'k',
             'elinewidth': 2,
         }
+        for k in kwargs:
+            data_err_opts.setdefault(k, kwargs[k])
         if np.sum([y != 0][0]) > 0:
             if ugh.plot_bins is None:
                 ugh.plot_bins = [y != 0][0]
@@ -196,6 +205,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
         if mask and not pseudo:
             _y = y
             _y[10:14] = np.nan
+            _y[6:9] = np.nan
         else:
             _y = y
 
@@ -225,18 +235,31 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
 
     def plot_step(bins, h, ax=None, label=None, nozeros=True, **kwargs):
-        if mask and not pseudo:
-            _h = h
-            #_h[10:14] = np.nan
-        else:
-            _h = h
-        ax.step(bins, _h, where='post', label=label, c=cdict[label], **kwargs)
+        ax.step(bins, h, where='post', label=label, c=cdict[label], lw=2, **kwargs)
 
     def plot_filled(bins, h, h0=0, ax=None, label=None, nozeros=True, **kwargs):
-        if h0 == 0:
+        if np.sum(h0) == 0:
             h0 = np.zeros_like(h)
-        ax.fill_between(bins, h, h0, 
-                        step='post', label=label, color=cdict[label], **kwargs)
+        if 'hatch' not in kwargs and 'color' not in kwargs:
+            kwargs['color'] = cdict[label]
+        else:
+            kwargs['edgecolor'] = cdict[label]
+        ax.fill_between(bins, h, h0,
+                        step='post', label=label, **kwargs)
+
+    def from_cats(fcn, name):
+        out = []
+        if name in mergedict.keys():
+            samples = mergedict[name]
+        else:
+            samples = [name]
+        for _name in samples:
+            for cat in cats:
+                try:
+                    out.append(fcn(cat[_name]))
+                except:
+                    print('Missing', _name)
+        return np.array(out) 
 
     # Sample proofing
     by_cat_samples = []
@@ -247,15 +270,6 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
         ]
         by_cat_samples.append(cat_samples)
 
-    from collections import Counter
-    count = Counter(sum(by_cat_samples, []))
-    k, v = list(count.keys()), list(count.values())
-    for _sample in np.array(k)[np.array(v) != max(v)]:
-        print("Sample {} is partially or entirely missing and won't be plotted".format(
-            _sample))
-
-    avail_samples = list(np.array(k)[np.array(v) == max(v)])
-
     # Plotting
     fig, (ax, rax) = plt.subplots(2, 1,
                                   gridspec_kw={'height_ratios': (3, 1)},
@@ -263,7 +277,6 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     plt.subplots_adjust(hspace=0)
 
     #  Main
-    # print(cats[0])
     if fromFD:
         res = np.array(list(map(tgasym_to_err, [cat['data'] for cat in cats])))
     else:
@@ -287,10 +300,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
     # Stack qcd/ttbar
     tot_h, bins = None, None
-    for mc, zo in zip(['qcd', 'tqq', 'stqq'], [2, 1, 0]):
-        if mc not in avail_samples:
-            continue
-        res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
+    for mc, zo in zip(['qcd'], [1]):
+        res = from_cats(th1_to_step, mc)
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
             plot_step(bins, h, ax=ax, label=mc, zorder=zo)
@@ -298,26 +309,30 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
         else:
             plot_step(bins, h + tot_h, label=mc, ax=ax, zorder=zo)
             tot_h += h
+    for mc in ['top', 'wcq', 'wqq']:
+        res = from_cats(th1_to_step, mc)
+        bins, h = res[:, 0][0], np.sum(np.nan_to_num(res[:, 1], 0), axis=0)
+        plot_filled(bins, h + tot_h, h0=tot_h, ax=ax, label=mc, facecolor='white', hatch='///')
+        tot_h += h
 
     # Stack plots
     tot_h, bins = None, None
-    stack_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    #stack_samples = ['zcc', 'zbb', 'zqq', 'wcq', 'wqq']
+    stack_samples = ['hbb', 'zcc', 'zbb', 'zqq', ]
     if not args.scaleH:
-        stack_samples = ['hcc', 'hbb'] + stack_samples
+        stack_samples = ['hcc'] + stack_samples
     for mc in stack_samples:
-        if mc not in avail_samples:
-            continue
-        res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
+        res = from_cats(th1_to_step, mc)
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
-            if mc == 'hcc':
+            if args.filled:
                 plot_filled(bins, h, h0=0, ax=ax, label=mc)
             else:
                 plot_step(bins, h, ax=ax, label=mc)
             tot_h = h
 
         else:
-            if mc == 'hcc':
+            if args.filled:
                 plot_filled(bins, h + tot_h, h0=tot_h, ax=ax, label=mc)
             else:
                 plot_step(bins, h + tot_h, label=mc, ax=ax)
@@ -325,10 +340,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
     # Separate scaled signal
     if args.scaleH:
-        for mc in ['hcc', 'hbb']:
-            if mc not in avail_samples:
-                continue
-            res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
+        for mc in ['hcc']:
+            res = from_cats(th1_to_step, mc)
             bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
             plot_step(bins, h * 500, ax=ax, label=mc,
                       linestyle='--')
@@ -353,12 +366,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     # _yerr += 0.0000000001  # pad zeros
 
     y = np.copy(_y)
-    #for mc in ['qcd', 'tqq', 'stqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
-    #for mc in ['qcd', 'tqq']:
-    for mc in ['qcd', 'tqq', 'stqq', 'wcq', 'wqq']:
-        if mc not in avail_samples:
-            continue
-        res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
+    for mc in ['qcd', 'top', 'vvqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
+        res = from_cats(th1_to_step, mc)
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         y -= h[:-1]
 
@@ -375,28 +384,26 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     # Error propagation, not sensitive to args[-1]
     err = prop_err(_y, _y-y, np.sqrt(_y), np.sqrt(_y), np.sqrt(_y-y), 1)
 
-    plot_data(_x, y, yerr=[err, err], xerr=_xerr, ax=rax, ugh=ugh)
+    plot_data(_x, y, yerr=[err, err], xerr=_xerr, ax=rax, ugh=ugh,  zorder=10)
 
     # Stack plots
     tot_h, bins = None, None
     #stack_samples = ['hbb', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
-    stack_samples = ['zbb', 'zcc', 'zqq']
-    #stack_samples = ['zcc']
+    #stack_samples = ['hbb', 'zcc', 'zbb', 'zqq', ]
+    stack_samples = ['zcc']
     if not args.scaleH:
-        stack_samples = ['hcc', 'hbb'] + stack_samples
+        stack_samples = ['hcc'] + stack_samples
     for mc in stack_samples:
-        if mc not in avail_samples:
-            continue
-        res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
+        res = from_cats(th1_to_step, mc)
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
-            if mc == 'hcc':
+            if args.filled:
                 plot_filled(bins, h / _scale_for_mc, ax=rax, label=mc)
             else:
                 plot_step(bins, h / _scale_for_mc, ax=rax, label=mc)
             tot_h = h
         else:
-            if mc == 'hcc':
+            if args.filled:
                 plot_filled(bins, (h + tot_h)/_scale_for_mc, tot_h/_scale_for_mc, ax=rax, label=mc)
             else:
                 plot_step(bins, (h + tot_h)/_scale_for_mc, label=mc, ax=rax)
@@ -404,10 +411,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
     # Separate scaled signal
     if args.scaleH:
-        for mc in ['hcc', 'hbb']:
-            if mc not in avail_samples:
-                continue
-            res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
+        for mc in ['hcc']:
+            res = from_cats(th1_to_step, mc)
             bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
             plot_step(bins, 500 * h / _scale_for_mc, ax=rax, label=mc,
                       linestyle='--')
@@ -431,7 +436,12 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
         lumi_t = "mu"
     else:
         lumi_t = "jet"
-    ax = hep.cms.cmslabel(ax=ax, data=((not pseudo) | toys), year=args.year, 
+    if args.run2:
+        ax = hep.cms.cmslabel(ax=ax, data=((not pseudo) | toys), year='', 
+                          lumi=np.sum([float(v) for k, v in lumi['jet'].items()]),
+                          fontsize=22)
+    else:
+        ax = hep.cms.cmslabel(ax=ax, data=((not pseudo) | toys), year=args.year, 
                           lumi=lumi[lumi_t][str(args.year)],
                           fontsize=22)
     ax.legend(ncol=2)
@@ -498,8 +508,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     # Leg sort
     if args.scaleH:
         label_dict['hcc'] = "$\mathrm{H(c\\bar{c})}$ x 500"
-        label_dict['hqq'] = "$\mathrm{H(b\\bar{b})}$ x 500"
-        label_dict['hbb'] = "$\mathrm{H(b\\bar{b})}$ x 500"
+        #label_dict['hqq'] = "$\mathrm{H(b\\bar{b})}$ x 500"
+        #label_dict['hbb'] = "$\mathrm{H(b\\bar{b})}$ x 500"
 
     sorted_handles_labels = hep.plot.sort_legend(ax, label_dict)
     # Insert dummy to uneven legend to align right
@@ -526,10 +536,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
 
 if args.fit is None:
-    if args.fitDiag:
-        shape_types = ['prefit', 'fit_s']    
-    else:
-        shape_types = ['prefit', 'postfit']
+    shape_types = ['prefit', 'fit_s']    
 else:
     shape_types = [args.fit]
 if args.three_regions:
@@ -537,10 +544,9 @@ if args.three_regions:
 else:
     regions = ['pass', 'fail']
 
-if args.fitDiag:
-    f = uproot.open(os.path.join(args.dir, 'fitDiagnostics.root'))
-else:
-    f = uproot.open(os.path.join(args.dir, args.input_file))
+
+# f = uproot.open(os.path.join(args.dir, args.input))
+f = uproot.open(args.input)
 for shape_type in shape_types:
     pbins = [450, 500, 550, 600, 675, 800, 1200]
     for region in regions:
@@ -556,14 +562,18 @@ for shape_type in shape_types:
                                  "namespaces were found in the file: {}".format(
                                     args.fit, f.keys()))
 
-            fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys)
-        if args.fitDiag:
-            full_plot([f['shapes_{}/ptbin{}{}{};1'.format(shape_type, i, region, args.year)] for i in range(0, 6)],
-                   pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys, fromFD=args.fitDiag, sqrtnerr=True)
+            fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys, fromFD=args.fitDiag, sqrtnerr=True)
+
+        if args.run2:
+            cat_list = [f['shapes_{}/ptbin{}{}{};1'.format(shape_type, i, region, '2016')] for i in range(0, 6)]
+            cat_list += [f['shapes_{}/ptbin{}{}{};1'.format(shape_type, i, region, '2017')] for i in range(0, 6)]
+            cat_list += [f['shapes_{}/ptbin{}{}{};1'.format(shape_type, i, region, '2018')] for i in range(0, 6)]
         else:
-            full_plot([f['ptbin{}{}{}_{};1'.format(i, region, args.year, shape_type)] for i in range(0, 6)],
-                   pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys, sqrtnerr=True)
+            cat_list = [f['shapes_{}/ptbin{}{}{};1'.format(shape_type, i, region, args.year)] for i in range(0, 6)]
+        full_plot(cat_list, pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys, fromFD=args.fitDiag, sqrtnerr=True)
+
         # MuonCR if included
+        # FIXME
         try:
             cat = f['muonCR{}_{};1'.format(region, shape_type)]
             full_plot([cat], args.pseudo, fittype=shape_type, toys=args.toys)
