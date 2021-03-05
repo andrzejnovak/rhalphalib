@@ -313,7 +313,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
         np.save('{}/MCTF'.format(model_name), _values)
         print('ptdeg', degsMC[0], 'rhodeg', degsMC[1])
         plotMCTF(*TF_smooth_plot(*TF_params(_values, _names)), MC=True, raw=True,
-                 ptdeg=degsMC[0], rhodeg=degsMC[1],
+                 ptdeg=degsMC[0], rhodeg=degsMC[1], year=args.year,
                  out='{}/plots/TF_MC_only'.format(model_name))
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
@@ -344,10 +344,14 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                                   ]
             # Remove unavailable samples
             _available = sorted(list(set([key.split("_pass")[0] for key in f.keys() if "pass" in key])))
+            found_samples = []
             for sName in include_samples:
                 if sName not in _available:
                     print('Sample `{}` is not available in templates file.'.format(sName))
-                    del include_samples[sName]
+                else:
+                    found_samples.append(sName)
+            include_samples = found_samples
+            #print("x", found_samples)
                 
             # Define mask
             mask = validbins[ptbin].copy()

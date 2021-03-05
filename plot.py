@@ -318,11 +318,13 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     # Stack plots
     tot_h, bins = None, None
     #stack_samples = ['zcc', 'zbb', 'zqq', 'wcq', 'wqq']
-    stack_samples = ['hbb', 'zcc', 'zbb', 'zqq', ]
+    stack_samples = ['hbb', 'zcc', 'zbb', 'zqq']
     if not args.scaleH:
         stack_samples = ['hcc'] + stack_samples
     for mc in stack_samples:
         res = from_cats(th1_to_step, mc)
+        if len(res) == 0:
+            continue
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
             if args.filled:
@@ -368,6 +370,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     y = np.copy(_y)
     for mc in ['qcd', 'top', 'vvqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
         res = from_cats(th1_to_step, mc)
+        if len(res) == 0:
+            continue
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         y -= h[:-1]
 
@@ -554,7 +558,7 @@ for shape_type in shape_types:
         mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
         for i in range(0, 6):
             if not args.run_all: continue
-            cat_name = 'ptbin{}{}{}_{};1'.format(i, region, args.year, shape_type)
+            cat_name = 'shapes_{}/ptbin{}{}{};1'.format(shape_type, i, region, args.year)
             try:
                 cat = f[cat_name]
             except Exception:
