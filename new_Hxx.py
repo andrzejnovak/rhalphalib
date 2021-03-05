@@ -138,6 +138,11 @@ def get_templ(f, region, sample, ptbin, syst=None, muon=False):
         h_vals = f[hist_name+"_bin{}".format(ptbin)].values
         h_edges = f[hist_name+"_bin{}".format(ptbin)].edges
         h_variances = f[hist_name+"_bin{}".format(ptbin)].variances
+    if np.any(h_vals < 0):
+        print("Sample {}, {}, {} has negative bins. They will be set to 0.".format(sample, region, ptbin))
+        _invalid = h_vals < 0
+        h_vals[_invalid] = 0
+        h_variances[_invalid] = 0
     h_key = 'msd'
     return (h_vals, h_edges, h_key, h_variances)
 
@@ -333,9 +338,16 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                 include_samples = ['zcc', "hcc"]
             else:
                 include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'tqq', 'stqq', 'vvqq',
-                                   'hcc', 'hbb',
+                                   'hcc', 'vbfhcc', 'whcc', 'zhcc',
+                                   'hbb', 'vbfhbb', 'whbb', 'zhbb', 'tthbb',
                                    #'zhbb', 'vbfhbb', 'whbb', 'tthbb',  # hbb signals
                                   ]
+            # Remove unavailable samples
+            _available = sorted(list(set([key.split("_pass")[0] for key in f.keys() if "pass" in key])))
+            for sName in include_samples:
+                if sName not in _available:
+                    print('Sample `{}` is not available in templates file.'.format(sName))
+                    del include_samples[sName]
                 
             # Define mask
             mask = validbins[ptbin].copy()
@@ -415,7 +427,6 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                         sample.setParamEffect(sys_ddxeffbb, _sfunc)
                     if sName in ["wcq", "wqq"]:
                         _sf, _sfunc = passfailSF(f, region, sName, ptbin, mask, SF[year]['W_SF'], SF[year]['W_SF_ERR'])
-                        print("Scaling", sName, _sf)
                         sample.scale(_sf)
                         sample.setParamEffect(sys_ddxeffw, _sfunc)
                         

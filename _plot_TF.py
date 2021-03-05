@@ -177,7 +177,7 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     if raw: 
         label = "MCRaw"
     import mplhep as hep
-    hep.cms.cmslabel(loc=2, data=not raw, rlabel="", ax=ax)
+    hep.cms.label(loc=2, data=not raw, rlabel="", ax=ax)
     if out is not None:
         fig.savefig('{}.png'.format(out))#, bbox_inches="tight")
     else:
