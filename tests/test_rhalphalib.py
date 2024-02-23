@@ -118,12 +118,15 @@ def test_rhalphabet(tmpdir):
                 "zqq": gaus_sample(norm=ptnorm * (200 if isPass else 100), loc=91, scale=8, obs=msd),
                 "tqq": gaus_sample(norm=ptnorm * (40 if isPass else 80), loc=150, scale=20, obs=msd),
                 "hqq": gaus_sample(norm=ptnorm * (20 if isPass else 5), loc=125, scale=8, obs=msd),
+                "hqq100": gaus_sample(norm=ptnorm * (20 if isPass else 5), loc=100, scale=2, obs=msd),
+                "hqq125": gaus_sample(norm=ptnorm * (20 if isPass else 5), loc=125, scale=2, obs=msd),
+                "hqq150": gaus_sample(norm=ptnorm * (20 if isPass else 5), loc=150, scale=2, obs=msd),
             }
-            for sName in ["zqq", "wqq", "tqq", "hqq"]:
+            for sName in ["zqq", "wqq", "tqq", "hqq", "hqq125", "hqq100", "hqq150"]:
                 # some mock expectations
                 templ = templates[sName]
-                stype = rl.Sample.SIGNAL if sName == "hqq" else rl.Sample.BACKGROUND
-                sample = rl.TemplateSample(ch.name + "_" + sName, stype, templ)
+                stype = rl.Sample.SIGNAL if "hqq" in sName else rl.Sample.BACKGROUND
+                sample = rl.TemplateSample(ch.name + "_" + sName, stype, templ, mass=True)
 
                 # mock systematics
                 jecup_ratio = np.random.normal(loc=1, scale=0.05, size=msd.nbins)

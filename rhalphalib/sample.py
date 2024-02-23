@@ -97,7 +97,7 @@ class Sample(object):
 
 
 class TemplateSample(Sample):
-    def __init__(self, name, sampletype, template):
+    def __init__(self, name, sampletype, template, mass=False):
         """
         name: self-explanatory
         sampletype: Sample.SIGNAL or BACKGROUND or DATA
@@ -120,6 +120,7 @@ class TemplateSample(Sample):
         self._paramEffectsDown = {}
         self._paramEffectScales = {}
         self._extra_dependencies = set()
+        self._mass_configurable = mass
 
     def show(self):
         print(self._nominal)

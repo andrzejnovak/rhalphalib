@@ -1,5 +1,5 @@
 from collections import OrderedDict
-import datetime
+import datetime, re
 from functools import reduce
 from itertools import chain
 import os
@@ -299,11 +299,15 @@ class Channel(object):
         observation = self.getObservation()
         if isinstance(observation, tuple):
             observation = observation[0]
+
+        mass_variable_samples = [s.name.split("_")[-1] for s in signalSamples if s._mass_configurable and any(char.isdigit() for char in s.name.split("_")[-1])]
+        mass_name_list = list(set([re.sub(r'[0-9]+', '', sName) for sName in mass_variable_samples]))
+        
         signalSamples = [s for s in self if s.sampletype == Sample.SIGNAL]
         nSig = len(signalSamples)
         bkgSamples = [s for s in self if s.sampletype == Sample.BACKGROUND]
         nBkg = len(bkgSamples)
-
+        
         params = self.parameters
         nuisanceParams = [p for p in params if p.hasPrior()]
         nuisanceParams.sort(key=lambda p: p.name)
@@ -316,6 +320,8 @@ class Channel(object):
             fout.write("jmax %d # number of samples minus 1\n" % (nSig + nBkg - 1))
             fout.write("kmax %d # number of nuisance parameters\n" % len(nuisanceParams))
             fout.write("shapes * {1} {0}.root {0}:{1}_$PROCESS {0}:{1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
+            for sName in mass_name_list:
+                fout.write("shapes {2} {1} {0}.root {0}:{1}_{2}$MASS {0}:{1}_{2}$MASS_$SYSTEMATIC\n".format(workspaceName, self.name, sName))
             fout.write("bin %s\n" % self.name)
             fout.write("observation %.3f\n" % observation.sum())
             table = []
